@@ -1,4 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import {
@@ -12,12 +13,45 @@ import {
   Text,
   View,
 } from 'react-native';
+import { supabase } from './lib/supabase';
 
 type Screen = 'home' | 'preview' | 'analyzing' | 'result';
 
+type DashboardAnalysis = {
+  analysisStatus: 'usable' | 'insufficient_image' | 'unsupported';
+  severity: 'low' | 'medium' | 'high' | 'unknown';
+  driveAdvice:
+    | 'do_not_drive'
+    | 'drive_to_service_only'
+    | 'schedule_service'
+    | 'monitor'
+    | 'unknown';
+  criticalSignal:
+    | 'red_oil_pressure'
+    | 'red_brake_warning'
+    | 'overheating_warning'
+    | 'flashing_check_engine'
+    | 'none'
+    | 'unknown';
+  title: string;
+  explanation: string;
+  observedEvidence: string[];
+  nextSteps: string[];
+  limitations: string[];
+};
+
 export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedMimeType, setSelectedMimeType] = useState('image/jpeg');
   const [screen, setScreen] = useState<Screen>('home');
+  const [analysis, setAnalysis] = useState<DashboardAnalysis | null>(null);
+
+  const selectImage = (asset: ImagePicker.ImagePickerAsset) => {
+    setSelectedImage(asset.uri);
+    setSelectedMimeType(asset.mimeType ?? 'image/jpeg');
+    setAnalysis(null);
+    setScreen('preview');
+  };
 
   const openCamera = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -25,25 +59,25 @@ export default function App() {
     if (!permission.granted) {
       Alert.alert(
         'Camera permission needed',
-        'Please allow camera access so you can photograph your dashboard warning lights.'
+        'Please allow camera access so you can photograph dashboard warning lights.'
       );
       return;
     }
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      quality: 0.8,
+      quality: 0.75,
       exif: false,
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      setScreen('preview');
+    if (!result.canceled && result.assets[0]) {
+      selectImage(result.assets[0]);
     }
   };
 
   const openPhotoLibrary = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
       Alert.alert(
@@ -55,27 +89,130 @@ export default function App() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.8,
+      quality: 0.75,
       exif: false,
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      setScreen('preview');
+    if (!result.canceled && result.assets[0]) {
+      selectImage(result.assets[0]);
     }
   };
 
-  const analyzePhoto = () => {
+  const ensureAnonymousSession = async () => {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw new Error('Could not verify the app session.');
+    }
+
+    if (session) {
+      return;
+    }
+
+    const { error } = await supabase.auth.signInAnonymously();
+
+    if (error) {
+      throw new Error('Could not start a secure app session.');
+    }
+  };
+
+  const analyzePhoto = async () => {
+    if (!selectedImage) {
+      return;
+    }
+
     setScreen('analyzing');
 
-    setTimeout(() => {
+    try {
+      await ensureAnonymousSession();
+
+      const imageBase64 = await FileSystem.readAsStringAsync(selectedImage, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (!imageBase64) {
+        throw new Error('Could not read the selected image.');
+      }
+
+      const { data, error } = await supabase.functions.invoke(
+        'analyze-dashboard',
+        {
+          body: {
+            imageBase64,
+            mimeType: selectedMimeType,
+          },
+        }
+      );
+
+      if (error) {
+        console.error('Analysis function error:', error);
+        throw new Error(
+          'The analysis service could not process this photo. Please try another image.'
+        );
+      }
+
+      const returnedAnalysis = data?.analysis as DashboardAnalysis | undefined;
+
+      if (!returnedAnalysis) {
+        throw new Error('No usable analysis was returned for this photo.');
+      }
+
+      setAnalysis(returnedAnalysis);
       setScreen('result');
-    }, 1600);
+    } catch (error) {
+      console.error('Dashboard analysis error:', error);
+
+      setScreen('preview');
+
+      Alert.alert(
+        'Analysis unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.'
+      );
+    }
   };
 
   const startOver = () => {
     setSelectedImage(null);
+    setSelectedMimeType('image/jpeg');
+    setAnalysis(null);
     setScreen('home');
+  };
+
+  const actionText = (driveAdvice: DashboardAnalysis['driveAdvice']) => {
+    switch (driveAdvice) {
+      case 'do_not_drive':
+        return 'Stop driving as soon as it is safe to do so. Shut off the engine and arrange professional inspection or towing.';
+
+      case 'drive_to_service_only':
+        return 'Avoid unnecessary driving. Arrange an inspection promptly and only drive directly to a nearby service location if the vehicle is operating normally.';
+
+      case 'schedule_service':
+        return 'Arrange a service appointment soon and monitor for any changes in warning lights or vehicle behavior.';
+
+      case 'monitor':
+        return 'Monitor the warning and check the owner’s manual. Arrange service if it returns, changes, or is accompanied by unusual symptoms.';
+
+      default:
+        return 'Review the owner’s manual and seek professional guidance if you are unsure about the warning indicator.';
+    }
+  };
+
+  const severityLabel = (severity: DashboardAnalysis['severity']) => {
+    switch (severity) {
+      case 'high':
+        return 'HIGH PRIORITY';
+      case 'medium':
+        return 'SERVICE SOON';
+      case 'low':
+        return 'MONITOR';
+      default:
+        return 'ASSESSMENT LIMITED';
+    }
   };
 
   if (screen === 'analyzing') {
@@ -93,7 +230,7 @@ export default function App() {
           <Text style={styles.analyzingTitle}>Reviewing dashboard photo</Text>
 
           <Text style={styles.analyzingDescription}>
-            Checking visible warning indicators and preparing recommended next
+            Checking visible warning indicators and preparing cautious next
             steps.
           </Text>
         </View>
@@ -101,76 +238,76 @@ export default function App() {
     );
   }
 
-  if (screen === 'result') {
+  if (screen === 'result' && analysis) {
+    const isHigh = analysis.severity === 'high';
+
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
 
         <ScrollView contentContainerStyle={styles.resultScreen}>
-          <View style={styles.highSeverityBadge}>
-            <Text style={styles.highSeverityBadgeText}>HIGH PRIORITY</Text>
+          <View
+            style={[
+              styles.severityBadge,
+              isHigh ? styles.highBadge : styles.standardBadge,
+            ]}
+          >
+            <Text style={styles.severityBadgeText}>
+              {severityLabel(analysis.severity)}
+            </Text>
           </View>
 
-          <Text style={styles.resultTitle}>Potential oil-pressure warning</Text>
+          <Text style={styles.resultTitle}>{analysis.title}</Text>
 
-          <Text style={styles.resultIntro}>
-            A red oil-pressure alert appears to be visible on the dashboard.
-            This can indicate that the engine may not be receiving enough oil
-            pressure.
-          </Text>
+          <Text style={styles.resultIntro}>{analysis.explanation}</Text>
 
           <View style={styles.resultCard}>
             <Text style={styles.resultCardLabel}>WHAT WAS OBSERVED</Text>
 
-            <Text style={styles.resultCardText}>
-              • Red oil-can warning symbol visible{'\n'}
-              • “Oil Pressure” message displayed{'\n'}
-              • Additional warning indicators may also be present
-            </Text>
+            {analysis.observedEvidence.length > 0 ? (
+              analysis.observedEvidence.map((item, index) => (
+                <Text key={`${item}-${index}`} style={styles.resultCardText}>
+                  • {item}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.resultCardText}>
+                • No reliable visual evidence could be confirmed.
+              </Text>
+            )}
           </View>
 
-          <View style={styles.actionCard}>
+          <View
+            style={[
+              styles.actionCard,
+              isHigh ? styles.highActionCard : styles.standardActionCard,
+            ]}
+          >
             <Text style={styles.actionIcon}>⚠️</Text>
 
             <View style={styles.actionText}>
               <Text style={styles.actionTitle}>Recommended action</Text>
 
               <Text style={styles.actionDescription}>
-                Stop driving as soon as it is safe to do so. Shut off the
-                engine and arrange professional inspection or towing.
+                {actionText(analysis.driveAdvice)}
               </Text>
             </View>
           </View>
 
           <Text style={styles.stepsTitle}>Next steps</Text>
 
-          <View style={styles.stepRow}>
-            <Text style={styles.stepNumber}>1</Text>
-            <Text style={styles.stepText}>
-              Pull over safely and turn off the engine.
-            </Text>
-          </View>
-
-          <View style={styles.stepRow}>
-            <Text style={styles.stepNumber}>2</Text>
-            <Text style={styles.stepText}>
-              Check the owner’s manual for the specific warning symbol.
-            </Text>
-          </View>
-
-          <View style={styles.stepRow}>
-            <Text style={styles.stepNumber}>3</Text>
-            <Text style={styles.stepText}>
-              Contact roadside assistance or a qualified mechanic.
-            </Text>
-          </View>
+          {analysis.nextSteps.map((step, index) => (
+            <View key={`${step}-${index}`} style={styles.stepRow}>
+              <Text style={styles.stepNumber}>{index + 1}</Text>
+              <Text style={styles.stepText}>{step}</Text>
+            </View>
+          ))}
 
           <View style={styles.disclaimerCard}>
             <Text style={styles.disclaimerTitle}>Important</Text>
 
             <Text style={styles.disclaimerText}>
-              This assessment is based on visible dashboard information only.
-              A photo cannot confirm the exact cause of a vehicle issue.
+              {analysis.limitations.join(' ')}
             </Text>
           </View>
 
@@ -417,16 +554,21 @@ const styles = StyleSheet.create({
     paddingTop: 42,
     paddingBottom: 34,
   },
-  highSeverityBadge: {
+  severityBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#7F1D1D',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
     marginBottom: 18,
   },
-  highSeverityBadgeText: {
-    color: '#FECACA',
+  highBadge: {
+    backgroundColor: '#7F1D1D',
+  },
+  standardBadge: {
+    backgroundColor: '#1E3A5F',
+  },
+  severityBadgeText: {
+    color: '#F8FAFC',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.1,
@@ -464,10 +606,15 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     flexDirection: 'row',
-    backgroundColor: '#3A2023',
     borderRadius: 18,
     padding: 18,
     marginBottom: 26,
+  },
+  highActionCard: {
+    backgroundColor: '#3A2023',
+  },
+  standardActionCard: {
+    backgroundColor: '#182A44',
   },
   actionIcon: {
     fontSize: 24,
