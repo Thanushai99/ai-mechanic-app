@@ -1,112 +1,202 @@
 # AI Mechanic
 
-A mobile dashboard warning-light triage app built with React Native, Expo, and TypeScript.
+A mobile dashboard warning-light triage app built with React Native, Expo, TypeScript, Supabase Edge Functions, and Gemini Vision AI.
 
-AI Mechanic lets users take or select a photo of their vehicle dashboard, review the image, and receive a clear, safety-focused explanation of visible warning indicators and suggested next steps.
+AI Mechanic lets a user take or select a dashboard photo, analyzes visible warning indicators, and returns cautious, safety-focused guidance. It is designed to explain what is visibly shown in the image—not to replace a mechanic or diagnose a vehicle.
 
-> This project is designed as a vehicle guidance tool, not a replacement for a qualified mechanic or professional diagnosis.
+## Features
 
-## Current MVP
+* Take a dashboard photo using the phone camera
+* Select a dashboard photo from the device library
+* Preview and retake images before analysis
+* Analyze dashboard images with Gemini Vision AI
+* Detect unsupported photos that are not vehicle dashboards
+* Handle unclear or insufficient dashboard images
+* Classify visible warning indicators by severity
+* Apply safety overrides for critical warnings
+* Return plain-language explanations and next steps
+* No visible signup or login required
 
-The current version includes:
+## Current Supported Flow
 
-* Dashboard photo capture using the device camera
-* Photo selection from the device library
-* Image preview and retake flow
-* Analysis loading screen
-* Safety-focused warning result screen
-* High-priority guidance for visible oil-pressure warnings
-* No login or account requirement
+```text
+Home
+→ Take Photo or Choose from Library
+→ Review Photo
+→ Anonymous Supabase Session
+→ Supabase Edge Function
+→ Gemini Vision Analysis
+→ Safety Rules Applied
+→ Result Screen
+```
 
-The current analysis result is a polished prototype flow using a fixed sample assessment. Real vision-AI analysis will be added in a future version.
+## Safety-First Design
 
-## Safety Principles
+This project intentionally focuses on visible dashboard warning indicators only.
 
-This app is intentionally conservative.
-
-It does not claim to:
+The app does not:
 
 * Diagnose an exact mechanical failure
-* Identify fault codes from a photo
+* Guess unseen vehicle problems
+* Estimate repair costs
+* Read fault codes
 * Guarantee that a vehicle is safe to drive
-* Replace roadside assistance, a mechanic, or emergency services
+* Replace a qualified mechanic, roadside assistance, or emergency services
 
-For visible red warning lights, smoke, overheating, brake concerns, fuel leaks, or unusual vehicle behavior, users should stop safely and seek professional assistance.
+For critical visible indicators such as oil-pressure, brake, or overheating warnings, the backend applies conservative safety guidance regardless of the model's wording.
+
+## Result States
+
+### Critical Warning
+
+For clearly visible critical indicators, the app can return:
+
+* High-priority severity
+* Do not drive guidance
+* Immediate next steps such as pulling over safely and arranging professional inspection or towing
+
+### No Visible Warning Indicators
+
+When no warning lights are visible, the app states only that no visible warning indicators were identified in the photo.
+
+It does not claim that the vehicle is safe or free of mechanical problems.
+
+### Unsupported Photo
+
+When the image is not a vehicle dashboard, the app returns:
+
+* Unsupported photo
+* Dashboard not detected
+* Instructions to upload a clear dashboard image
+
+### Insufficient Image
+
+When the dashboard is blurry, cropped, obscured, or unreadable, the app asks the user to retake the image instead of guessing.
 
 ## Tech Stack
+
+### Mobile App
 
 * React Native
 * Expo
 * TypeScript
 * Expo Image Picker
-* Expo Camera access through Image Picker
+* Expo File System
 
-## Current User Flow
+### Backend
+
+* Supabase Edge Functions
+* Supabase Anonymous Authentication
+* Gemini Vision API
+
+## Architecture
 
 ```text
-Home Screen
-→ Take Photo or Choose from Library
-→ Review Dashboard Photo
-→ Analysis Loading Screen
-→ Safety-Focused Result
-→ Scan Another Photo
+Mobile App
+  ↓
+Anonymous Supabase Session
+  ↓
+Supabase Edge Function
+  ↓
+Gemini Vision API
+  ↓
+Structured JSON Response
+  ↓
+Safety Overrides
+  ↓
+Mobile Result Screen
 ```
 
-## Planned Features
+The Gemini API key is stored only as a Supabase Edge Function secret.
 
-* Vision AI integration for dashboard warning-light recognition
-* Structured AI responses with severity levels
-* Backend safety rules that can override unsafe AI recommendations
-* Image quality validation
-* Better support for multiple warning-light types
-* Local scan history
-* Anonymous rate limiting
-* Error handling and offline states
-* TestFlight release
+It is not included in:
 
-## Getting Started
+* The mobile app
+* The GitHub repository
+* The README
+* Local source files committed to Git
 
-### Prerequisites
+## Project Structure
 
-* Node.js
-* npm
-* Expo Go on an iPhone or Android device
+```text
+App.tsx
+  Mobile user interface, image flow, and result presentation
 
-### Install
+lib/supabase.ts
+  Supabase client and anonymous session configuration
+
+supabase/functions/analyze-dashboard/index.ts
+  Edge Function that validates images, calls Gemini, applies safety rules,
+  and returns structured analysis results
+```
+
+## Local Setup
+
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### Start the app
+### 2. Add local environment variables
+
+Create a `.env` file in the project root:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=your-supabase-project-url
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
+
+Do not commit `.env`.
+
+### 3. Configure Supabase
+
+Create a Supabase project and configure:
+
+* Anonymous sign-ins enabled
+* An `analyze-dashboard` Edge Function
+* A `GEMINI_API_KEY` Edge Function secret
+
+### 4. Run the app
 
 ```bash
 npx expo start
 ```
 
-Then scan the QR code using:
+Then scan the Expo QR code with an iPhone or Android device.
 
-* The iPhone Camera app, then open the link in Expo Go
-* Expo Go directly on Android
+## Testing Performed
 
-## Privacy
+The current version has been tested with:
 
-The current prototype does not upload dashboard images to a backend or third-party AI provider.
+* A visible red oil-pressure warning
+* A dashboard with no illuminated warning indicators
+* A non-dashboard photo
 
-Photos are selected or captured on the user’s device for the local app flow only. Future AI integration will include clear privacy disclosures, minimal image retention, and safety-first handling of user data.
+Expected behavior:
 
-## Project Status
+```text
+Critical warning
+→ High priority and conservative “do not drive” guidance
 
-Active development.
+No visible warning lights
+→ Assessment limited, without a safety guarantee
 
-Current milestone:
+Non-dashboard image
+→ Unsupported photo and dashboard retake guidance
+```
 
-* Camera capture, photo-library selection, preview, loading state, and safety-focused prototype results completed.
+## Future Improvements
 
-Next milestone:
-
-* Replace the fixed prototype result with a controlled AI analysis pipeline and backend safety rules.
+* Better image-quality checks before AI analysis
+* Additional warning-light categories
+* Rate limiting for public use
+* Scan history stored locally
+* Accessibility improvements
+* Automated tests for edge-case photo results
+* TestFlight distribution
+* App Store release preparation
 
 ## Author
 
-Built by Thanushai as a portfolio project demonstrating mobile development, product design, API integration planning, and safety-focused AI application design.
+Built by Thanushai as a portfolio project demonstrating mobile development, backend integration, AI vision workflows, secure API design, and safety-focused product thinking.
