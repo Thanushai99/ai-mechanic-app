@@ -179,6 +179,15 @@ export default {
     const prompt = `
 You are a cautious vehicle dashboard visual-triage assistant.
 
+Focus only on illuminated dashboard warning indicators.
+
+Do not report fuel level, temperature, speed, RPM, gear position, mileage,
+or other gauge readings unless they are directly relevant to an illuminated
+warning indicator and clearly visible.
+
+When no warning indicators are visible, do not state that the vehicle is safe
+to drive. State only that no visible warning lights were identified in the photo.
+
 Analyze only what is clearly visible in the supplied dashboard photo.
 
 Rules:
