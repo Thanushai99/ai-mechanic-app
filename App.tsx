@@ -215,6 +215,47 @@ export default function App() {
     }
   };
 
+  const getResultPresentation = (result: DashboardAnalysis) => {
+    if (result.analysisStatus === 'unsupported') {
+      return {
+        badge: 'UNSUPPORTED PHOTO',
+        title: 'Dashboard not detected',
+        description:
+          'This photo does not appear to show a vehicle dashboard. No warning lights can be identified from this image.',
+        action:
+          'Choose a clear photo of your vehicle dashboard, focused on any illuminated warning indicators.',
+        steps: [
+          'Take or select a photo of the full dashboard.',
+          'Make sure warning lights are visible and not blocked by glare.',
+        ],
+      };
+    }
+
+    if (result.analysisStatus === 'insufficient_image') {
+      return {
+        badge: 'PHOTO NEEDS RETAKING',
+        title: 'Dashboard warning lights could not be read',
+        description:
+          'The dashboard photo was not clear enough to reliably identify warning indicators.',
+        action:
+          'Retake the photo in better lighting and make sure the warning lights are sharp and fully visible.',
+        steps: [
+          'Hold the phone steady and avoid glare.',
+          'Include the full dashboard warning-light area.',
+          'Try again with a brighter, clearer photo.',
+        ],
+      };
+    }
+
+    return {
+      badge: severityLabel(result.severity),
+      title: result.title,
+      description: result.explanation,
+      action: actionText(result.driveAdvice),
+      steps: result.nextSteps,
+    };
+  };
+
   if (screen === 'analyzing') {
     return (
       <SafeAreaView style={styles.container}>
@@ -240,6 +281,7 @@ export default function App() {
 
   if (screen === 'result' && analysis) {
     const isHigh = analysis.severity === 'high';
+    const presentation = getResultPresentation(analysis);
 
     return (
       <SafeAreaView style={styles.container}>
@@ -252,14 +294,12 @@ export default function App() {
               isHigh ? styles.highBadge : styles.standardBadge,
             ]}
           >
-            <Text style={styles.severityBadgeText}>
-              {severityLabel(analysis.severity)}
-            </Text>
+            <Text style={styles.severityBadgeText}>{presentation.badge}</Text>
           </View>
 
-          <Text style={styles.resultTitle}>{analysis.title}</Text>
+          <Text style={styles.resultTitle}>{presentation.title}</Text>
 
-          <Text style={styles.resultIntro}>{analysis.explanation}</Text>
+          <Text style={styles.resultIntro}>{presentation.description}</Text>
 
           <View style={styles.resultCard}>
             <Text style={styles.resultCardLabel}>WHAT WAS OBSERVED</Text>
@@ -289,14 +329,14 @@ export default function App() {
               <Text style={styles.actionTitle}>Recommended action</Text>
 
               <Text style={styles.actionDescription}>
-                {actionText(analysis.driveAdvice)}
+                {presentation.action}
               </Text>
             </View>
           </View>
 
           <Text style={styles.stepsTitle}>Next steps</Text>
 
-          {analysis.nextSteps.map((step, index) => (
+          {presentation.steps.map((step, index) => (
             <View key={`${step}-${index}`} style={styles.stepRow}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
               <Text style={styles.stepText}>{step}</Text>
