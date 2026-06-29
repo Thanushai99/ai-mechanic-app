@@ -20,6 +20,11 @@ import {
   saveScanHistoryItem,
   type ScanHistoryItem,
 } from './lib/history';
+import {
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+} from '@supabase/supabase-js';
 
 type Screen = 'home' | 'preview' | 'analyzing' | 'result' | 'history';
 
@@ -45,6 +50,78 @@ type DashboardAnalysis = {
   nextSteps: string[];
   limitations: string[];
 };
+
+type AnalysisErrorCopy = {
+  title: string;
+  message: string;
+};
+
+async function getAnalysisErrorCopy(
+  error: unknown
+): Promise<AnalysisErrorCopy> {
+  const fallback = {
+    title: 'Analysis unavailable',
+    message:
+      'We could not analyze this dashboard photo right now. Please try again shortly.',
+  };
+
+  if (error instanceof FunctionsFetchError) {
+    return {
+      title: 'Connection problem',
+      message:
+        'Your dashboard photo could not reach the analysis service. Check your internet connection and try again.',
+    };
+  }
+
+  if (error instanceof FunctionsRelayError) {
+    return {
+      title: 'Service unavailable',
+      message:
+        'The analysis service could not be reached right now. Please try again shortly.',
+    };
+  }
+
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const responseBody = await error.context.json();
+
+      const message =
+        responseBody &&
+          typeof responseBody === 'object' &&
+          'error' in responseBody &&
+          responseBody.error &&
+          typeof responseBody.error === 'object' &&
+          'message' in responseBody.error &&
+          typeof responseBody.error.message === 'string'
+          ? responseBody.error.message.toLowerCase()
+          : '';
+
+      if (message.includes('too large')) {
+        return {
+          title: 'Photo too large',
+          message:
+            'Please choose a smaller dashboard photo or retake it from closer up.',
+        };
+      }
+
+      if (
+        message.includes('quota') ||
+        message.includes('limit') ||
+        message.includes('temporarily unavailable')
+      ) {
+        return {
+          title: 'Analysis temporarily unavailable',
+          message:
+            'The AI analysis service is temporarily unavailable. Please try again later.',
+        };
+      }
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
 
 export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -156,9 +233,7 @@ export default function App() {
 
       if (error) {
         console.error('Analysis function error:', error);
-        throw new Error(
-          'The analysis service could not process this photo. Please try another image.'
-        );
+        throw error;
       }
 
       const returnedAnalysis = data?.analysis as DashboardAnalysis | undefined;
@@ -192,14 +267,11 @@ export default function App() {
     } catch (error) {
       console.error('Dashboard analysis error:', error);
 
+      const errorCopy = await getAnalysisErrorCopy(error);
+
       setScreen('preview');
 
-      Alert.alert(
-        'Analysis unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong. Please try again.'
-      );
+      Alert.alert(errorCopy.title, errorCopy.message);
     }
   };
 
