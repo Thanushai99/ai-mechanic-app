@@ -1,30 +1,43 @@
 {
   "expo": {
-    "name": "ai-mechanic",
+    "name": "AI Mechanic",
     "slug": "ai-mechanic",
     "version": "1.0.0",
+    "scheme": "aimechanic",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#101827"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.thanushai.kandiahariyanayagam.aimechanic",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#101827"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AI Mechanic uses your photo library so you can select a dashboard photo for warning-light analysis.",
+          "cameraPermission": "AI Mechanic uses your camera to photograph a vehicle dashboard for warning-light analysis.",
+          "microphonePermission": false
+        }
+      ]
+    ]
   }
 }
