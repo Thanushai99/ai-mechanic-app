@@ -14,25 +14,30 @@ import {
   View,
 } from 'react-native';
 import { supabase } from './lib/supabase';
+import {
+  getScanHistory,
+  saveScanHistoryItem,
+  type ScanHistoryItem,
+} from './lib/history';
 
-type Screen = 'home' | 'preview' | 'analyzing' | 'result';
+type Screen = 'home' | 'preview' | 'analyzing' | 'result' | 'history';
 
 type DashboardAnalysis = {
   analysisStatus: 'usable' | 'insufficient_image' | 'unsupported';
   severity: 'low' | 'medium' | 'high' | 'unknown';
   driveAdvice:
-    | 'do_not_drive'
-    | 'drive_to_service_only'
-    | 'schedule_service'
-    | 'monitor'
-    | 'unknown';
+  | 'do_not_drive'
+  | 'drive_to_service_only'
+  | 'schedule_service'
+  | 'monitor'
+  | 'unknown';
   criticalSignal:
-    | 'red_oil_pressure'
-    | 'red_brake_warning'
-    | 'overheating_warning'
-    | 'flashing_check_engine'
-    | 'none'
-    | 'unknown';
+  | 'red_oil_pressure'
+  | 'red_brake_warning'
+  | 'overheating_warning'
+  | 'flashing_check_engine'
+  | 'none'
+  | 'unknown';
   title: string;
   explanation: string;
   observedEvidence: string[];
@@ -45,6 +50,7 @@ export default function App() {
   const [selectedMimeType, setSelectedMimeType] = useState('image/jpeg');
   const [screen, setScreen] = useState<Screen>('home');
   const [analysis, setAnalysis] = useState<DashboardAnalysis | null>(null);
+  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
 
   const selectImage = (asset: ImagePicker.ImagePickerAsset) => {
     setSelectedImage(asset.uri);
@@ -160,6 +166,26 @@ export default function App() {
         throw new Error('No usable analysis was returned for this photo.');
       }
 
+      try {
+        if (returnedAnalysis.analysisStatus === 'usable') {
+          await saveScanHistoryItem({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            createdAt: new Date().toISOString(),
+            analysisStatus: returnedAnalysis.analysisStatus,
+            severity: returnedAnalysis.severity,
+            title: returnedAnalysis.title,
+            explanation: returnedAnalysis.explanation,
+            driveAdvice: returnedAnalysis.driveAdvice,
+            criticalSignal: returnedAnalysis.criticalSignal,
+            observedEvidence: returnedAnalysis.observedEvidence,
+            nextSteps: returnedAnalysis.nextSteps,
+            limitations: returnedAnalysis.limitations,
+          });
+        }
+      } catch (historyError) {
+        console.warn('Could not save scan history:', historyError);
+      }
+
       setAnalysis(returnedAnalysis);
       setScreen('result');
     } catch (error) {
@@ -182,6 +208,38 @@ export default function App() {
     setAnalysis(null);
     setScreen('home');
   };
+
+  async function openHistory() {
+    try {
+      const savedHistory = await getScanHistory();
+
+      setScanHistory(savedHistory);
+      setScreen('history');
+    } catch (historyError) {
+      console.warn('Could not load scan history:', historyError);
+
+      Alert.alert(
+        'History unavailable',
+        'Your previous scans could not be loaded right now.'
+      );
+    }
+  }
+
+  function openHistoryItem(item: ScanHistoryItem) {
+    setAnalysis({
+      analysisStatus: item.analysisStatus,
+      severity: item.severity,
+      driveAdvice: item.driveAdvice,
+      criticalSignal: item.criticalSignal ?? 'unknown',
+      title: item.title,
+      explanation: item.explanation,
+      observedEvidence: item.observedEvidence,
+      nextSteps: item.nextSteps,
+      limitations: item.limitations,
+    });
+
+    setScreen('result');
+  }
 
   const actionText = (driveAdvice: DashboardAnalysis['driveAdvice']) => {
     switch (driveAdvice) {
@@ -288,6 +346,11 @@ export default function App() {
         <StatusBar style="light" />
 
         <ScrollView contentContainerStyle={styles.resultScreen}>
+          <View style={styles.resultTopBar}>
+            <Pressable style={styles.homeButton} onPress={startOver}>
+              <Text style={styles.homeButtonText}>Home</Text>
+            </Pressable>
+          </View>
           <View
             style={[
               styles.severityBadge,
@@ -354,6 +417,77 @@ export default function App() {
           <Pressable style={styles.primaryButton} onPress={startOver}>
             <Text style={styles.primaryButtonText}>Scan Another Photo</Text>
           </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (screen === 'history') {
+    return (
+      <SafeAreaView style={styles.historyScreen}>
+        <StatusBar style="light" />
+
+        <ScrollView contentContainerStyle={styles.historyContent}>
+          <View style={styles.historyHeader}>
+            <View style={styles.historyHeaderText}>
+              <Text style={styles.historyEyebrow}>YOUR DEVICE</Text>
+              <Text style={styles.historyTitle}>Scan history</Text>
+              <Text style={styles.historySubtitle}>
+                Previous dashboard checks saved on this iPhone.
+              </Text>
+            </View>
+
+            <Pressable
+              style={styles.historyCloseButton}
+              onPress={() => setScreen('home')}
+            >
+              <Text style={styles.historyCloseButtonText}>Close</Text>
+            </Pressable>
+          </View>
+
+          {scanHistory.length === 0 ? (
+            <View style={styles.emptyHistoryCard}>
+              <Text style={styles.emptyHistoryTitle}>No scans yet</Text>
+              <Text style={styles.emptyHistoryText}>
+                Dashboard checks you complete will appear here.
+              </Text>
+            </View>
+          ) : (
+            scanHistory.map((item) => (
+              <Pressable
+                key={item.id}
+                style={styles.historyCard}
+                onPress={() => openHistoryItem(item)}
+              >
+                <View style={styles.historyCardTopRow}>
+                  <Text style={styles.historyCardTitle}>{item.title}</Text>
+
+                  <Text
+                    style={[
+                      styles.historySeverity,
+                      item.severity === 'high' && styles.historySeverityHigh,
+                      item.severity === 'medium' && styles.historySeverityMedium,
+                      item.severity === 'low' && styles.historySeverityLow,
+                    ]}
+                  >
+                    {item.severity.toUpperCase()}
+                  </Text>
+                </View>
+
+                <Text style={styles.historyDate}>
+                  {new Date(item.createdAt).toLocaleString()}
+                </Text>
+
+                <Text style={styles.historyExplanation}>
+                  {item.explanation}
+                </Text>
+
+                <Text style={styles.historyAdvice}>
+                  Recommended: {item.driveAdvice.replaceAll('_', ' ')}
+                </Text>
+              </Pressable>
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -429,6 +563,10 @@ export default function App() {
           <Text style={styles.secondaryButtonText}>
             Choose Photo from Library
           </Text>
+        </Pressable>
+
+        <Pressable style={styles.historyShortcut} onPress={openHistory}>
+          <Text style={styles.historyShortcutText}>View scan history</Text>
         </Pressable>
       </View>
 
@@ -720,5 +858,169 @@ const styles = StyleSheet.create({
     color: '#AAB7C8',
     fontSize: 13,
     lineHeight: 19,
+  },
+  historyShortcut: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+
+  historyShortcutText: {
+    color: '#93C5FD',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  historyScreen: {
+    flex: 1,
+    backgroundColor: '#101827',
+  },
+
+  historyContent: {
+    padding: 24,
+    paddingBottom: 40,
+    gap: 16,
+  },
+
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 16,
+    marginBottom: 8,
+  },
+
+  historyHeaderText: {
+    flex: 1,
+  },
+
+  historyEyebrow: {
+    color: '#93C5FD',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+
+  historyTitle: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+
+  historySubtitle: {
+    color: '#94A3B8',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  historyCloseButton: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  historyCloseButtonText: {
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  emptyHistoryCard: {
+    backgroundColor: '#182235',
+    borderWidth: 1,
+    borderColor: '#26334D',
+    borderRadius: 16,
+    padding: 20,
+    gap: 8,
+  },
+
+  emptyHistoryTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+
+  emptyHistoryText: {
+    color: '#94A3B8',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  historyCard: {
+    backgroundColor: '#182235',
+    borderWidth: 1,
+    borderColor: '#26334D',
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
+  },
+
+  historyCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+
+  historyCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+    flex: 1,
+  },
+
+  historySeverity: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  historySeverityHigh: {
+    color: '#F87171',
+  },
+
+  historySeverityMedium: {
+    color: '#FBBF24',
+  },
+
+  historySeverityLow: {
+    color: '#86EFAC',
+  },
+
+  historyDate: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+
+  historyExplanation: {
+    color: '#E2E8F0',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  historyAdvice: {
+    color: '#93C5FD',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resultTopBar: {
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+
+  homeButton: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  homeButtonText: {
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
