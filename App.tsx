@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { supabase } from './lib/supabase';
 import {
+  clearScanHistory,
   getScanHistory,
   saveScanHistoryItem,
   type ScanHistoryItem,
@@ -223,6 +224,40 @@ export default function App() {
         'Your previous scans could not be loaded right now.'
       );
     }
+  }
+
+  async function clearHistory() {
+    try {
+      await clearScanHistory();
+      setScanHistory([]);
+    } catch (historyError) {
+      console.warn('Could not clear scan history:', historyError);
+
+      Alert.alert(
+        'Could not clear history',
+        'Your saved scans could not be deleted right now.'
+      );
+    }
+  }
+
+  function confirmClearHistory() {
+    Alert.alert(
+      'Clear scan history?',
+      'This will permanently delete all saved dashboard checks from this iPhone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear history',
+          style: 'destructive',
+          onPress: () => {
+            void clearHistory();
+          },
+        },
+      ]
+    );
   }
 
   function openHistoryItem(item: ScanHistoryItem) {
@@ -437,12 +472,23 @@ export default function App() {
               </Text>
             </View>
 
-            <Pressable
-              style={styles.historyCloseButton}
-              onPress={() => setScreen('home')}
-            >
-              <Text style={styles.historyCloseButtonText}>Close</Text>
-            </Pressable>
+            <View style={styles.historyActions}>
+              <Pressable
+                style={styles.historyCloseButton}
+                onPress={() => setScreen('home')}
+              >
+                <Text style={styles.historyCloseButtonText}>Close</Text>
+              </Pressable>
+
+              {scanHistory.length > 0 && (
+                <Pressable
+                  style={styles.clearHistoryButton}
+                  onPress={confirmClearHistory}
+                >
+                  <Text style={styles.clearHistoryButtonText}>Clear all</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
           {scanHistory.length === 0 ? (
@@ -1021,6 +1067,21 @@ const styles = StyleSheet.create({
   homeButtonText: {
     color: '#E2E8F0',
     fontSize: 14,
+    fontWeight: '700',
+  },
+  historyActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+
+  clearHistoryButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+
+  clearHistoryButtonText: {
+    color: '#FCA5A5',
+    fontSize: 13,
     fontWeight: '700',
   },
 });

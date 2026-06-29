@@ -15,14 +15,15 @@ export type ScanHistoryItem = {
     | 'schedule_service'
     | 'monitor'
     | 'unknown';
-   
-   criticalSignal:
-  | 'red_oil_pressure'
-  | 'red_brake_warning'
-  | 'overheating_warning'
-  | 'flashing_check_engine'
-  | 'none'
-  | 'unknown'; 
+
+  criticalSignal:
+    | 'red_oil_pressure'
+    | 'red_brake_warning'
+    | 'overheating_warning'
+    | 'flashing_check_engine'
+    | 'none'
+    | 'unknown';
+        
   observedEvidence: string[];
   nextSteps: string[];
   limitations: string[];
