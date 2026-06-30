@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Linking,
 } from 'react-native';
 import { supabase } from './lib/supabase';
 import {
@@ -127,6 +128,9 @@ async function getAnalysisErrorCopy(
   return fallback;
 }
 
+const PRIVACY_POLICY_URL =
+  'https://thanushai99.github.io/ai-mechanic-app/privacy.html';
+
 export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedMimeType, setSelectedMimeType] = useState('image/jpeg');
@@ -161,6 +165,19 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  async function openPrivacyPolicy() {
+    try {
+      await Linking.openURL(PRIVACY_POLICY_URL);
+    } catch (error) {
+      console.warn('Could not open privacy policy:', error);
+
+      Alert.alert(
+        'Could not open privacy policy',
+        'Please check your internet connection and try again.'
+      );
+    }
+  }
 
   async function acceptConsent() {
     try {
@@ -780,6 +797,14 @@ export default function App() {
         <Pressable style={styles.historyShortcut} onPress={openHistory}>
           <Text style={styles.historyShortcutText}>View scan history</Text>
         </Pressable>
+
+        <Pressable
+          style={styles.historyShortcut}
+          onPress={() => void openPrivacyPolicy()}
+        >
+          <Text style={styles.historyShortcutText}>Privacy Policy</Text>
+        </Pressable>
+
       </View>
 
       <Text style={styles.footer}>
