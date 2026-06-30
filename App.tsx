@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +25,10 @@ import {
   FunctionsHttpError,
   FunctionsRelayError,
 } from '@supabase/supabase-js';
+import {
+  hasAcceptedConsent,
+  saveConsentAcceptance,
+} from './lib/consent';
 
 type Screen = 'home' | 'preview' | 'analyzing' | 'result' | 'history';
 
@@ -129,6 +133,44 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [analysis, setAnalysis] = useState<DashboardAnalysis | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [hasConsent, setHasConsent] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadConsentStatus() {
+      try {
+        const accepted = await hasAcceptedConsent();
+
+        if (isMounted) {
+          setHasConsent(accepted);
+        }
+      } catch (consentError) {
+        console.warn('Could not load consent status:', consentError);
+      } finally {
+        if (isMounted) {
+          setConsentChecked(true);
+        }
+      }
+    }
+
+    void loadConsentStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function acceptConsent() {
+    try {
+      await saveConsentAcceptance();
+    } catch (consentError) {
+      console.warn('Could not save consent status:', consentError);
+    }
+
+    setHasConsent(true);
+  }
 
   const selectImage = (asset: ImagePicker.ImagePickerAsset) => {
     setSelectedImage(asset.uri);
@@ -420,6 +462,58 @@ export default function App() {
       steps: result.nextSteps,
     };
   };
+
+  if (!consentChecked) {
+    return (
+      <SafeAreaView style={styles.consentScreen}>
+        <StatusBar style="light" />
+
+        <View style={styles.consentLoading}>
+          <ActivityIndicator size="large" color="#60A5FA" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <SafeAreaView style={styles.consentScreen}>
+        <StatusBar style="light" />
+
+        <ScrollView contentContainerStyle={styles.consentContent}>
+          <Text style={styles.consentEyebrow}>DASHSIGNAL AI</Text>
+
+          <Text style={styles.consentTitle}>Before you scan</Text>
+
+          <Text style={styles.consentBody}>
+            To analyze visible warning lights, DashSignal AI sends the dashboard
+            photo you choose to an analysis service that uses Google Gemini.
+          </Text>
+
+          <View style={styles.consentCard}>
+            <Text style={styles.consentCardTitle}>Important</Text>
+
+            <Text style={styles.consentCardText}>
+              Results are visual guidance only. They are not a mechanical
+              diagnosis and cannot confirm the exact cause of a vehicle issue.
+            </Text>
+
+            <Text style={styles.consentCardText}>
+              Do not rely on this app in an emergency or when immediate vehicle
+              safety is in question.
+            </Text>
+          </View>
+
+          <Pressable
+            style={styles.consentButton}
+            onPress={() => void acceptConsent()}
+          >
+            <Text style={styles.consentButtonText}>I Understand</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   if (screen === 'analyzing') {
     return (
@@ -1155,5 +1249,77 @@ const styles = StyleSheet.create({
     color: '#FCA5A5',
     fontSize: 13,
     fontWeight: '700',
+  },
+  consentScreen: {
+    flex: 1,
+    backgroundColor: '#101827',
+  },
+
+  consentLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  consentContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    gap: 18,
+  },
+
+  consentEyebrow: {
+    color: '#93C5FD',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+
+  consentTitle: {
+    color: '#FFFFFF',
+    fontSize: 34,
+    fontWeight: '800',
+  },
+
+  consentBody: {
+    color: '#CBD5E1',
+    fontSize: 17,
+    lineHeight: 26,
+  },
+
+  consentCard: {
+    backgroundColor: '#182235',
+    borderWidth: 1,
+    borderColor: '#26334D',
+    borderRadius: 16,
+    padding: 18,
+    gap: 12,
+  },
+
+  consentCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  consentCardText: {
+    color: '#CBD5E1',
+    fontSize: 15,
+    lineHeight: 23,
+  },
+
+  consentButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+
+  consentButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });
