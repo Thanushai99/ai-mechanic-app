@@ -757,7 +757,7 @@ export default function App() {
 
       <View style={styles.content}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>AI VEHICLE TRIAGE</Text>
+          <Text style={styles.badgeText}>DashSignal AI</Text>
         </View>
 
         <Text style={styles.title}>
@@ -784,7 +784,7 @@ export default function App() {
 
         <Pressable style={styles.primaryButton} onPress={openCamera}>
           <Text style={styles.primaryButtonText}>
-            Scan Dashboard Warning Light
+            Scan Dashboard Warning Lights
           </Text>
         </Pressable>
 
@@ -808,7 +808,7 @@ export default function App() {
       </View>
 
       <Text style={styles.footer}>
-        Version 1 · Dashboard warning-light scanner
+        Dashboard warning-light guidance · Not a diagnosis
       </Text>
     </SafeAreaView>
   );
