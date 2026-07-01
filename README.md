@@ -8,14 +8,15 @@ DashSignal AI lets users take or select a dashboard photo, analyzes visible warn
 
 <p align="center">
   <img src="docs/screenshots/home_page.png" alt="DashSignal AI home screen" width="220" />
-  <img src="docs/screenshots/photo_choice_page.png" alt="Choose camera or photo library screen" width="220" />
-  <img src="docs/screenshots/review_page.png" alt="Dashboard photo review screen" width="220" />
+  <img src="docs/screenshots/review_page.png" alt="Photo selection screen" width="220" />
+  <img src="docs/screenshots/photo_review_page.png" alt="Dashboard photo review screen" width="220" />
 </p>
 
 <p align="center">
   <img src="docs/screenshots/result_page.png" alt="Critical warning result with recommended next steps" width="220" />
   <img src="docs/screenshots/history_page.png" alt="Locally saved scan history" width="220" />
 </p>
+
 
 ## Features
 
