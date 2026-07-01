@@ -1,26 +1,44 @@
-# AI Mechanic
+# DashSignal AI
 
-A mobile dashboard warning-light triage app built with React Native, Expo, TypeScript, Supabase Edge Functions, and Gemini Vision AI.
+A safety-focused iOS dashboard warning-light guidance app built with React Native, Expo, TypeScript, Supabase Edge Functions, and Gemini Vision AI.
 
-AI Mechanic lets a user take or select a dashboard photo, analyzes visible warning indicators, and returns cautious, safety-focused guidance. It is designed to explain what is visibly shown in the image—not to replace a mechanic or diagnose a vehicle.
+DashSignal AI lets users take or select a dashboard photo, analyzes visible warning indicators, and returns cautious next-step guidance. It is designed to explain what is visibly shown in the image—not to diagnose a vehicle or replace a mechanic.
+
+## App Walkthrough
+
+<p align="center">
+  <img src="docs/screenshots/home_page.png" alt="DashSignal AI home screen" width="220" />
+  <img src="docs/screenshots/photo_choice_page.png" alt="Choose camera or photo library screen" width="220" />
+  <img src="docs/screenshots/review_page.png" alt="Dashboard photo review screen" width="220" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/result_page.png" alt="Critical warning result with recommended next steps" width="220" />
+  <img src="docs/screenshots/history_page.png" alt="Locally saved scan history" width="220" />
+</p>
 
 ## Features
 
 * Take a dashboard photo using the phone camera
 * Select a dashboard photo from the device library
 * Preview and retake images before analysis
-* Analyze dashboard images with Gemini Vision AI
-* Detect unsupported photos that are not vehicle dashboards
+* Analyze visible dashboard warning indicators with Gemini Vision AI
+* Detect unsupported images that are not vehicle dashboards
 * Handle unclear or insufficient dashboard images
 * Classify visible warning indicators by severity
-* Apply safety overrides for critical warnings
+* Apply conservative safety overrides for critical warnings
 * Return plain-language explanations and next steps
-* No visible signup or login required
+* Save scan results locally on the device
+* Clear locally saved scan history
+* Show first-use consent and privacy disclosures
+* Open an in-app Privacy Policy page
+* No visible signup or password required
 
-## Current Supported Flow
+## Current User Flow
 
 ```text
-Home
+First-Use Consent
+→ Home
 → Take Photo or Choose from Library
 → Review Photo
 → Anonymous Supabase Session
@@ -28,11 +46,12 @@ Home
 → Gemini Vision Analysis
 → Safety Rules Applied
 → Result Screen
+→ Optional Local Scan History
 ```
 
 ## Safety-First Design
 
-This project intentionally focuses on visible dashboard warning indicators only.
+This project intentionally focuses only on visible dashboard warning indicators.
 
 The app does not:
 
@@ -82,12 +101,15 @@ When the dashboard is blurry, cropped, obscured, or unreadable, the app asks the
 * TypeScript
 * Expo Image Picker
 * Expo File System
+* AsyncStorage
 
-### Backend
+### Backend and AI
 
 * Supabase Edge Functions
 * Supabase Anonymous Authentication
-* Gemini Vision API
+* Gemini Vision AI
+* Structured JSON responses
+* Server-side safety overrides
 
 ## Architecture
 
@@ -105,6 +127,8 @@ Structured JSON Response
 Safety Overrides
   ↓
 Mobile Result Screen
+  ↓
+Optional Local Scan History
 ```
 
 The Gemini API key is stored only as a Supabase Edge Function secret.
@@ -120,14 +144,23 @@ It is not included in:
 
 ```text
 App.tsx
-  Mobile user interface, image flow, and result presentation
+  Mobile interface, image flow, consent gate, history, and result presentation
 
 lib/supabase.ts
   Supabase client and anonymous session configuration
 
+lib/history.ts
+  Local scan-history storage and clearing logic
+
+lib/consent.ts
+  First-use consent storage and retrieval
+
 supabase/functions/analyze-dashboard/index.ts
   Edge Function that validates images, calls Gemini, applies safety rules,
   and returns structured analysis results
+
+privacy.html
+  Public Privacy Policy hosted through GitHub Pages
 ```
 
 ## Local Setup
@@ -170,8 +203,13 @@ Then scan the Expo QR code with an iPhone or Android device.
 The current version has been tested with:
 
 * A visible red oil-pressure warning
+* Dashboard maintenance reminders
 * A dashboard with no illuminated warning indicators
 * A non-dashboard photo
+* Local scan-history saving and clearing
+* First-use consent behavior
+* Privacy Policy access
+* Signed iOS TestFlight deployment
 
 Expected behavior:
 
@@ -190,13 +228,12 @@ Non-dashboard image
 
 * Better image-quality checks before AI analysis
 * Additional warning-light categories
-* Rate limiting for public use
-* Scan history stored locally
+* Rate limiting for broader public use
 * Accessibility improvements
 * Automated tests for edge-case photo results
-* TestFlight distribution
-* App Store release preparation
+* Optional user accounts and cloud-backed history
+* Paid AI-service tier for higher usage limits
 
 ## Author
 
-Built by Thanushai as a portfolio project demonstrating mobile development, backend integration, AI vision workflows, secure API design, and safety-focused product thinking.
+Built by Thanushai as a portfolio project demonstrating mobile development, backend integration, AI vision workflows, secure API design, local persistence, privacy-aware product design, and safety-focused UX.
